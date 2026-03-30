@@ -407,7 +407,7 @@ post_cases = pd.read_sql(
 )
 
 # Cursor und Verbindung schließen
-dataocean_connection.close()
+dataocean_cursor.close()
 dataocean_connection.close()
 
 
