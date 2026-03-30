@@ -29,6 +29,10 @@ elif filter_user == "oumaima.el-bellam":
     filter_user_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/trello_credentials.txt"
     )
+elif filter_user == 'alexander.maletz':
+    filter_user_credentials = (
+        "/Users/alexander.maletz/Documents/Credentials/trello.txt"
+    )
 # Datei trello_credentials einlesen
 with open(filter_user_credentials, "r") as file:
     lines = file.readlines()
@@ -42,6 +46,10 @@ if filter_user == "david.wetzels":
 elif filter_user == "oumaima.el-bellam":
     dataocean_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/dataocean.txt"
+    )
+elif filter_user == 'alexander.maletz':
+    dataocean_credentials = (
+        "/Users/alexander.maletz/Documents/Credentials/dataocean.txt"
     )
 
 # connection to dataocean
