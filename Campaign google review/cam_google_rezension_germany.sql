@@ -12,7 +12,8 @@ with case_cube as (
 								'DAK-Gesundheit',
 								'Generali Health Solutions GmbH (GHS) (Unternehmenskunden)',
 								'Generali Mobile Health App',
-								'Generali Versicherung AG'
+								'Generali Versicherung AG',
+								'Pronova BKK'
 								)
 		and voucher_code is not null 
 		and voucher_code != ''
