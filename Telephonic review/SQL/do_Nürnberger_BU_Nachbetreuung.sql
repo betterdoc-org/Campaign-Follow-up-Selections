@@ -82,7 +82,7 @@ select
 from
 	final
 where 
-	result_date between '2026-01-09' and '2026-03-02'
+	result_date between '2026-03-02' and '2026-04-01'
 )
 select * from final_cam_select where case_id not in (select case_id from trello_mentalis)
 
