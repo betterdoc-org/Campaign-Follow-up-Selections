@@ -174,7 +174,9 @@ where
 			----case where mails are allowed
 		(
 			(current_date - greatest(ss_prem_send.ss_send_date, ss_prem_send.prem_send_date) >= 17
-				and (report_assura.qualimed is null or report_assura.qualimed = 'nein')
+				-- decission (09.06.2026): Assura Qualimed should be included (Jana Allofs & Ulrike Wettstein-Munk)
+				-- https://betterdoc.slack.com/archives/C0B62LQ19TQ/p1780911964805529
+				--and (report_assura.qualimed is null or report_assura.qualimed = 'nein')
 			)
 		or 
 			----post cases
