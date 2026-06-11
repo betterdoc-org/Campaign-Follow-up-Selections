@@ -89,7 +89,8 @@ all_cases = pd.read_sql(
     		left join staging.stg_borg__vouchers on stg_borg__vouchers.id = stg_borg__inquiries.voucher_ids[0]::int
     	WHERE
     		stg_borg__inquiries.state like 'waiting_q3'
-    		and stg_borg__inquiries.treatment_type like 'second_opinion_before_surgery'
+            -- decission to include all cases with all inquiry types https://betterdoc.atlassian.net/wiki/spaces/PC/pages/5214797899/Arbeitspakete+f+r+die+Optimierung+der+Selektion+Priorisierung+in+HOC
+    		-- and stg_borg__inquiries.treatment_type like 'second_opinion_before_surgery'
     		and stg_borg__inquiry_physician_contact_entries.q3_result is null
     		and stg_borg__inquiry_appointments.appointment_type = '3'
     		and stg_borg__inquiry_appointments.state in('sent', 'call_patient')
