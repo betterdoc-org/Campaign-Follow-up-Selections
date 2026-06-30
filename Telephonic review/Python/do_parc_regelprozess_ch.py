@@ -81,7 +81,11 @@ with cube_services as (
 		and product = 'MSS'
 		--New focus on cases before surgery, because of a big backlog.
 		--decission made with Lea S, Saranga T. & Stefanie L. K. (27.11.2025)
-		and inquiry_type in ('second_opinion_before_surgery', 'surgery')
+		and (inquiry_type in ('second_opinion_before_surgery', 'surgery')
+			-- Decission (30.06.2026) to include conservative cases of Agrisano
+			-- payer_name = 'Agrisano AGRI-smart'
+			or payer_id = 577
+			)
 ),
 pii_cube_services as (
 	select * from pii_analytics.pii_cube_services
