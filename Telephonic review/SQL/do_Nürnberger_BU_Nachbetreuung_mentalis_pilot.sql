@@ -42,7 +42,7 @@ final as (
 								left join md_campaigns.cam_batch on cam_select.batch_id = cam_batch.batch_id
 							where 
 								case_id is not null
-								and cam_batch.cam_id = 108
+								and cam_batch.cam_id = 109
 							)
 		and NOT communication_facts.primary_phone ~* 'Ma'
 		and cube_services.case_id not in (---------Todesfälle
@@ -93,7 +93,7 @@ select * from final_cam_select
 
 --insert into md_campaigns.cam_batch
 select
-	108 as cam_id,--------Anrufaktion Nürnberger Mentalis
+	109 as cam_id,--------Anrufaktion Nürnberger Mentalis
 	(select max(batch_id) from md_campaigns.cam_select) as batch_id,
 	'bd_nachtelefonie' as batch_acceptor,
 	current_date as batch_selection_date,
