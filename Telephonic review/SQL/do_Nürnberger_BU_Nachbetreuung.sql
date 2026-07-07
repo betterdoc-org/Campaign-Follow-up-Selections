@@ -39,7 +39,7 @@ final as (
 								left join md_campaigns.cam_batch on cam_select.batch_id = cam_batch.batch_id
 							where 
 								case_id is not null
-								and cam_batch.cam_id = 57
+								and cam_batch.cam_id in (109, 57) -- selections nürnberger (mentalis & not mentalis)
 							)
 		and NOT communication_facts.primary_phone ~* 'Ma'
 		and cube_services.case_id not in (---------Todesfälle
