@@ -35,10 +35,10 @@ elif filter_user == "oumaima.el-bellam":
     filter_user_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/trello_credentials.txt"
     )
-elif filter_user == 'alexander.maletz':
-    filter_user_credentials = (
-        "/Users/alexander.maletz/Documents/Credentials/trello.txt"
-    )
+elif filter_user == "alexander.maletz":
+    filter_user_credentials = "/Users/alexander.maletz/Documents/Credentials/trello.txt"
+elif filter_user == "anja.kruse":
+    filter_user_credentials = "/Users/anja.kruse/Documents/Access/trello.txt"
 
 # Datei trello_credentials einlesen
 with open(filter_user_credentials, "r") as file:
@@ -54,10 +54,12 @@ elif filter_user == "oumaima.el-bellam":
     dataocean_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/dataocean.txt"
     )
-elif filter_user == 'alexander.maletz':
+elif filter_user == "alexander.maletz":
     dataocean_credentials = (
         "/Users/alexander.maletz/Documents/Credentials/dataocean.txt"
     )
+elif filter_user == "anja.kruse":
+    dataocean_credentials = "/Users/anja.kruse/Documents/Access/dataocean.txt"
 
 # connection to dataocean
 dataocean_connection = psycopg2.connect(open(dataocean_credentials).read())
@@ -83,9 +85,9 @@ all_cases = pd.read_sql(
 		stg_borg__inquiries.state as korb,
 		date_part('week', current_date) as current_week,
 		date_part('week', case when stg_borg__inquiry_appointments.state like 'call_patient' then dim_clean_borg_results.least_result_date
-							when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date 
+							when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date
 							else results_sent_at end) as week_appdate
-	FROM 
+	FROM
 		staging.stg_borg__inquiries
     	left join analytics.dim_clean_borg_results on stg_borg__inquiries.service_id_key_systems = dim_clean_borg_results.service_id_key_systems
 		LEFT JOIN staging.stg_borg__inquiry_appointments on stg_borg__inquiries.id = stg_borg__inquiry_appointments.inquiry_id
@@ -102,15 +104,15 @@ all_cases = pd.read_sql(
 		and stg_borg__inquiry_physician_contact_entries.q3_result is null
 		and stg_borg__inquiry_appointments.appointment_type = '3'
 		and stg_borg__inquiry_appointments.state in('sent', 'call_patient')
-		/*and stg_borg__inquiry_appointments.inquiry_id not in (select inquiry_id 
+		/*and stg_borg__inquiry_appointments.inquiry_id not in (select inquiry_id
 																from staging.stg_borg__inquiry_appointments
-																where (appointment_type = '3' 
+																where (appointment_type = '3'
 																		and state like 'completed'))*/ --Muss ausgeschlossen werden, damit erreichte Fälle der Nachbetreuung nachtelefoniert werden
 		and stg_borg__vouchers.client_name not in ('VIP GELB', 'VIP ROT', 'BetterDoc Staff')
-		and (stg_borg__vouchers.value not like '%-MSSNACHRSO' 
-			and stg_borg__vouchers.value not like '%-BDTC' 
-			and stg_borg__vouchers.value not like 'NUBU-7777' 
-			and stg_borg__vouchers.value not like '%AXAP-%' 
+		and (stg_borg__vouchers.value not like '%-MSSNACHRSO'
+			and stg_borg__vouchers.value not like '%-BDTC'
+			and stg_borg__vouchers.value not like 'NUBU-7777'
+			and stg_borg__vouchers.value not like '%AXAP-%'
 			and stg_borg__vouchers.value not like 'ARAG-CM22')
 	ORDER BY
 		stg_borg__inquiries.case_id, app_state, voucher_client_name
@@ -121,18 +123,18 @@ all_cases = pd.read_sql(
 		voucher_client_name as client_name,
 		first_voucher_code,
 		null::int as patient_id,
-		0 as control_flag, 
-		1 as count_cases_patient, 
+		0 as control_flag,
+		1 as count_cases_patient,
 		null::numeric as reached_patient_flag,
-		null::date as reached_date, 
+		null::date as reached_date,
 		null::text as refusal_reason,
-		null::numeric as opt_out, 
+		null::numeric as opt_out,
 		null::text as new_case_id,
 		app_state,
 		korb,
 		'de' as preferred_language,
 		null as post
-	from 
+	from
 		borg_data
 	where rn = '1'
 		and ((app_state like 'sent'
@@ -150,7 +152,7 @@ all_cases = pd.read_sql(
 		i.voucher_ids[0]::int as voucher_id,
 		i.treatment_type,
 		i.state as korb,
-		ia.appointment_type, 
+		ia.appointment_type,
 		ia.state as app_state,
 		v.client_name,
 		v.value
@@ -176,17 +178,17 @@ all_cases = pd.read_sql(
 		scheduled_date ASC
 	),
 final_post as (
-	select 
+	select
 		case_id,
 		client_name as client_name,
 		value as first_voucher_code,
 		null::int as patient_id,
-		0 as control_flag, 
-		1 as count_cases_patient, 
+		0 as control_flag,
+		1 as count_cases_patient,
 		null::numeric as reached_patient_flag,
-		null::date as reached_date, 
+		null::date as reached_date,
 		null::text as refusal_reason,
-		null::numeric as opt_out, 
+		null::numeric as opt_out,
 		null::text as new_case_id,
 		app_state,
 		korb,
@@ -196,7 +198,7 @@ final_post as (
 ),
 union_regelprozess_post as (
 select * from final_regelprozess
-union all 
+union all
 select * from final_post
 ),
    final as (
@@ -208,12 +210,12 @@ select * from final_post
        client_name,
        first_voucher_code,
 		patient_id,
-		control_flag, 
-		count_cases_patient, 
+		control_flag,
+		count_cases_patient,
 		reached_patient_flag,
-		reached_date, 
+		reached_date,
 		refusal_reason,
-		opt_out, 
+		opt_out,
 		new_case_id,
 		app_state,
 		korb,
@@ -221,7 +223,7 @@ select * from final_post
 		post,
 		CASE WHEN cs.admission_channel IN ('online_marketing', 'partner_funnel') THEN 1 ELSE 0 END AS om_flag,
 		cs.inquiry_type
-   from 
+   from
    	union_regelprozess_post
    	left join (select distinct on (case_id) * from analytics.cube_services where product = 'MSS') as cs on union_regelprozess_post.case_id = cs.case_id
    )
@@ -365,7 +367,7 @@ post_cases = pd.read_sql(
     	ia.scheduled_date,
     	i.treatment_type,
     	i.state as korb,
-    	ia.appointment_type, 
+    	ia.appointment_type,
     	ia.state as app_state,
     	v.client_name
     from
@@ -388,19 +390,19 @@ post_cases = pd.read_sql(
 		!!! New decision to include 'surgery' in the selection of 'Regelprozess'
 		!!! 02.02.2026: Jira DA-3454
 		*/
-    	and (v.client_name not like '%DAK%' 
+    	and (v.client_name not like '%DAK%'
     		and treatment_type not in ('second_opinion_before_surgery', 'surgery'))
     	and v.client_name not like 'AXA Haftpflichtversicherung'
-    order by 
+    order by
     	i.case_id,
     	i.state ASC
     )
-    select 
+    select
     	case_id,
     	client_name,
     	app_state,
     	treatment_type
-    from 
+    from
     	foo
 """,
     dataocean_connection,

@@ -29,10 +29,11 @@ elif filter_user == "oumaima.el-bellam":
     filter_user_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/trello_credentials.txt"
     )
-elif filter_user == 'alexander.maletz':
-    filter_user_credentials = (
-        "/Users/alexander.maletz/Documents/Credentials/trello.txt"
-    )
+elif filter_user == "alexander.maletz":
+    filter_user_credentials = "/Users/alexander.maletz/Documents/Credentials/trello.txt"
+elif filter_user == "anja.kruse":
+    filter_user_credentials = "/Users/anja.kruse/Documents/Access/trello.txt"
+
 # Datei trello_credentials einlesen
 with open(filter_user_credentials, "r") as file:
     lines = file.readlines()
@@ -47,10 +48,12 @@ elif filter_user == "oumaima.el-bellam":
     dataocean_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/dataocean.txt"
     )
-elif filter_user == 'alexander.maletz':
+elif filter_user == "alexander.maletz":
     dataocean_credentials = (
         "/Users/alexander.maletz/Documents/Credentials/dataocean.txt"
     )
+elif filter_user == "anja.kruse":
+    dataocean_credentials = "/Users/anja.kruse/Documents/Access/dataocean.txt"
 
 # connection to dataocean
 dataocean_connection = psycopg2.connect(open(dataocean_credentials).read())
@@ -65,7 +68,7 @@ dataocean_cursor = dataocean_connection.cursor()
 all_cases = pd.read_sql(
     """
                  select *
-        from 
+        from
         (
         with borg_data as (
         SELECT
@@ -79,9 +82,9 @@ all_cases = pd.read_sql(
     		stg_borg__inquiries.state as korb,
     		date_part('week', current_date) as current_week,
     		date_part('week', case when stg_borg__inquiry_appointments.state like 'call_patient' then dim_clean_borg_results.least_result_date
-    							when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date 
+    							when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date
     							else results_sent_at end) as week_appdate
-    	FROM 
+    	FROM
     		staging.stg_borg__inquiries
             left join analytics.dim_clean_borg_results on stg_borg__inquiries.service_id_key_systems = dim_clean_borg_results.service_id_key_systems
     		LEFT JOIN staging.stg_borg__inquiry_appointments on stg_borg__inquiries.id = stg_borg__inquiry_appointments.inquiry_id
@@ -94,15 +97,15 @@ all_cases = pd.read_sql(
     		and stg_borg__inquiry_physician_contact_entries.q3_result is null
     		and stg_borg__inquiry_appointments.appointment_type = '3'
     		and stg_borg__inquiry_appointments.state in('sent', 'call_patient')
-    		and stg_borg__inquiry_appointments.inquiry_id not in (select inquiry_id 
+    		and stg_borg__inquiry_appointments.inquiry_id not in (select inquiry_id
     																from staging.stg_borg__inquiry_appointments
-    																where (appointment_type = '3' 
+    																where (appointment_type = '3'
     																		and state like 'completed'))
     		and stg_borg__vouchers.value like '%VRTC%'
-        	and (stg_borg__vouchers.value not like '%-MSSNACHRSO' 
-        		and stg_borg__vouchers.value not like '%-BDTC' 
-        		and stg_borg__vouchers.value not like 'NUBU-7777' 
-        		and stg_borg__vouchers.value not like '%AXAP-%' 
+        	and (stg_borg__vouchers.value not like '%-MSSNACHRSO'
+        		and stg_borg__vouchers.value not like '%-BDTC'
+        		and stg_borg__vouchers.value not like 'NUBU-7777'
+        		and stg_borg__vouchers.value not like '%AXAP-%'
         		and stg_borg__vouchers.value not like 'ARAG-CM22')
     	ORDER BY
     		app_state, voucher_client_name
@@ -114,16 +117,16 @@ all_cases = pd.read_sql(
     		voucher_client_name as client_name,
     		first_voucher_code,
     		null::int as patient_id,
-    		0 as control_flag, 
-    		1 as count_cases_patient, 
+    		0 as control_flag,
+    		1 as count_cases_patient,
     		null::numeric as reached_patient_flag,
-    		null::date as reached_date, 
+    		null::date as reached_date,
     		null::text as refusal_reason,
-    		null::numeric as opt_out, 
+    		null::numeric as opt_out,
     		null::text as new_case_id,
     		app_state,
     		korb
-    	from 
+    	from
     		borg_data
     	where rn = '1'
     		and ((app_state like 'sent'
@@ -136,12 +139,12 @@ all_cases = pd.read_sql(
         ) MSS
         union all
         select *
-        from 
+        from
         (
         	with foo as (
         	SELECT
         		services.case_id,
-        		payers.name, 
+        		payers.name,
         		services.voucher_code,
         		communication_facts.preferred_language,
         		survey_links.response_status,
@@ -149,11 +152,11 @@ all_cases = pd.read_sql(
         		case when surveys.title like '%PMS%' then surveys.title
         				else null
         				end as title,
-        		case when services.case_id in (select survey_links.case_id 
-        										from "communication-cs-surveys".survey_links 
+        		case when services.case_id in (select survey_links.case_id
+        										from "communication-cs-surveys".survey_links
         										left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id
         										where surveys.title like '%Allrounder%') then 'Allrounder' --Patient hat Status Survey inklusive PREM Link bekommen (Termin unbekannt)
-        			 when services.case_id in (select survey_links.case_id 
+        			 when services.case_id in (select survey_links.case_id
         			 								from "communication-cs-surveys".survey_links
         			 								left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id
         			 								where surveys.title like '%Reha%') then 'Reha' --Patient hat direkt PREM bekommen (Termin war bekannt)
@@ -173,11 +176,11 @@ all_cases = pd.read_sql(
         		LEFT JOIN "service-cs-selection".vouchers ON services.voucher_id = vouchers.id
         		left join "case-cs-workflow-events".events ON services.case_id = events.case_id
         		LEFT JOIN "communication-cs-surveys".survey_links ON survey_links.case_id = services.case_id
-        		LEFT JOIN "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id	
+        		LEFT JOIN "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id
         		LEFT JOIN "patient-cs-communication-facts".communication_facts ON services.case_id = communication_facts.case_id
         		LEFT JOIN (select case_id, fazit
         					from (select case_id, event_time as fazit, row_number() over (partition by case_id order by event_time desc) as rn
-        							from "case-cs-workflow-events".events 
+        							from "case-cs-workflow-events".events
         							where event_type like 'DID_SEND_FINAL%') no_dublicates
         					where rn = 1
         							) fazit ON services.case_id = fazit.case_id
@@ -187,16 +190,16 @@ all_cases = pd.read_sql(
         		and events.event_type like '%DID_SEND_FINAL%'
         		and services.service_id like '%:PMS%'
         		and (surveys.title like '%Nachbefragung%' or channel_recommendation not like 'email')
-        		and services.case_id not in (select survey_links.case_id 
+        		and services.case_id not in (select survey_links.case_id
         								from "communication-cs-surveys".survey_links
-        			 					left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id					
+        			 					left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id
         								where surveys.title like '%Nachbefragung%' and response_status is not null) --SS/PREM noch nicht beantwortet
         		and services.case_id not in (select case_id from "case-cs-workflow-events".events where event_type like '%DID_RECEIVE%') --betrachtet alle completion reasons, auch mehrfach nicht erreicht!! Ändern?
         		and services.case_id not in (select events.case_id from "case-cs-workflow-events".events where event_type like '%DID_CLOSE%' and (event_body -> 'properties' ->> 'reason' like '%Keine weitere Befragung%' or event_body -> 'properties' ->> 'reason' like '%Befragung unangebracht%' or event_body -> 'properties' ->> 'reason' like '%Kontaktadresse%'))
         		--im folgenden: keine Fälle in Anrufaktion, bei denen schon PROM rausgegangen ist
-        		and services.case_id not in (select survey_links.case_id 
+        		and services.case_id not in (select survey_links.case_id
         									from "communication-cs-surveys".survey_links
-        			 						left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id								
+        			 						left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id
         									where surveys.title like '%PROM%')
         		and services.case_id not in (select case_id from staging.stg_communication_cs_conversations__conversations where product like 'PMS%' and topics = '["feedback_follow_up"]' and case_id is not null)
         		and services.case_id not in (select case_id
@@ -207,16 +210,16 @@ all_cases = pd.read_sql(
         	select
         		(select max(select_id) from md_campaigns.cam_select) + row_number() over() as select_id,
         		(select max(batch_id) from md_campaigns.cam_select) + 1 as batch_id, ----------Überprüfen, ob die Lieferung mit MSS verknüpft werden kann
-        		case_id, 
+        		case_id,
         		name as client_name,
         		voucher_code as first_voucher_code,
         		null::int as patient_id,
-        		0 as control_flag, 
-        		1 as count_cases_patient, 
+        		0 as control_flag,
+        		1 as count_cases_patient,
         		null::numeric as reached_patient_flag,
-        		null::date as reached_date, 
+        		null::date as reached_date,
         		null::text as refusal_reason,
-        		null::numeric as opt_out, 
+        		null::numeric as opt_out,
         		null::text as new_case_id,
         		case when case_fb like 'SS' then 'call_patient' when case_fb like 'PREM' then 'sent' end as app_state,
         		null::text as korb

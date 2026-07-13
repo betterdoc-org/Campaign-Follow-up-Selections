@@ -35,10 +35,10 @@ elif filter_user == "oumaima.el-bellam":
     filter_user_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/trello_credentials.txt"
     )
-elif filter_user == 'alexander.maletz':
-    filter_user_credentials = (
-        "/Users/alexander.maletz/Documents/Credentials/trello.txt"
-    )
+elif filter_user == "alexander.maletz":
+    filter_user_credentials = "/Users/alexander.maletz/Documents/Credentials/trello.txt"
+elif filter_user == "anja.kruse":
+    filter_user_credentials = "/Users/anja.kruse/Documents/Access/trello.txt"
 
 # Datei trello_credentials einlesen
 with open(filter_user_credentials, "r") as file:
@@ -54,10 +54,12 @@ elif filter_user == "oumaima.el-bellam":
     dataocean_credentials = (
         "/Users/oumaima.el-bellam/Documents/Credentials/dataocean.txt"
     )
-elif filter_user == 'alexander.maletz':
+elif filter_user == "alexander.maletz":
     dataocean_credentials = (
         "/Users/alexander.maletz/Documents/Credentials/dataocean.txt"
     )
+elif filter_user == "anja.kruse":
+    dataocean_credentials = "/Users/anja.kruse/Documents/Access/dataocean.txt"
 
 # connection to dataocean
 dataocean_connection = psycopg2.connect(open(dataocean_credentials).read())
@@ -72,11 +74,11 @@ dataocean_cursor = dataocean_connection.cursor()
 all_cases = pd.read_sql(
     """
 with cube_services as (
-	select * 
-	from 
-		analytics.cube_services 
-	where 
-		payer_group = 'kv' 
+	select *
+	from
+		analytics.cube_services
+	where
+		payer_group = 'kv'
 		and result_date > current_date - interval '6 month'
 		and product = 'MSS'
 		--New focus on cases before surgery, because of a big backlog.
@@ -97,16 +99,16 @@ workflow_events as (
 	select * from analytics.fct_workflow_events where case_id is not null
 ),
 existing_follow_up_response as (
-select 
+select
 	survey_links.case_id,
 	surveys.title,
 	survey_links.response_status,
-	survey_links.data_fetched_at 
-from 
+	survey_links.data_fetched_at
+from
 	staging.stg_communication_cs_surveys__survey_links survey_links
-	left join staging.stg_communication_cs_surveys__surveys surveys ON surveys.id = survey_links.survey_id					
-where 
-	surveys.title ilike '%Nachbefragung%' 
+	left join staging.stg_communication_cs_surveys__surveys surveys ON surveys.id = survey_links.survey_id
+where
+	surveys.title ilike '%Nachbefragung%'
 	and survey_links.response_status is not null
 	and survey_links.case_id is not null
 ),
@@ -115,22 +117,22 @@ select
 	case_id,
 	max(case when upper(event_type) = 'DID_SEND_STATUS_SURVEY' then workflow_event_date end) as ss_send_date,
 	max(case when upper(event_type) = 'DID_SEND_PREM_SURVEY' then workflow_event_date end) as prem_send_date
-from 
-	workflow_events  
-where 
+from
+	workflow_events
+where
 	upper(event_type) in ('DID_SEND_STATUS_SURVEY', 'DID_SEND_PREM_SURVEY')
-group by 
+group by
 	case_id
 ),
 case_closed_or_response_received as (
-select 
+select
 	case_id,
 	event_type,
 	workflow_event_date
-from 
-	workflow_events  
-where 
-	(event_type like '%DID_CLOSE%' 
+from
+	workflow_events
+where
+	(event_type like '%DID_CLOSE%'
 	or event_type like '%DID_RECEIVE%')
 ), --betrachtet alle completion reasons, auch mehrfach nicht erreicht!! Ändern?
 campaigns as (
@@ -140,10 +142,10 @@ select
 	cam_select.batch_id,
 	cam_batch.batch_selection_date,
 	cam_batch.cam_id
-from 
+from
 	md_campaigns.cam_select
 	left join md_campaigns.cam_batch on cam_select.batch_id = cam_batch.batch_id
-where 
+where
 	cam_batch.cam_id = 6
 	and cam_select.case_id is not null
 ),
@@ -165,7 +167,7 @@ select
 	pii_cube_services.preferred_language,
 	greatest(ss_prem_send.ss_send_date, ss_prem_send.prem_send_date) as latest_ss_prem_send_date,
 	current_date - greatest(ss_prem_send.ss_send_date, ss_prem_send.prem_send_date) as latest_ss_prem_send_age
-from 
+from
 	cube_services
 	left join report_assura on cube_services.service_id_key_systems = report_assura.service_id_key_systems
 	left join pii_cube_services on cube_services.service_id_key_systems = pii_cube_services.service_id_key_systems
@@ -174,7 +176,7 @@ where
 	cube_services.case_id not in (select case_id from campaigns)
 	and cube_services.case_id not in (select case_id from existing_follow_up_response)
 	and cube_services.case_id not in (select case_id from case_closed_or_response_received)
-	and 	
+	and
 			----case where mails are allowed
 		(
 			(current_date - greatest(ss_prem_send.ss_send_date, ss_prem_send.prem_send_date) >= 17
@@ -182,7 +184,7 @@ where
 				-- https://betterdoc.slack.com/archives/C0B62LQ19TQ/p1780911964805529
 				--and (report_assura.qualimed is null or report_assura.qualimed = 'nein')
 			)
-		or 
+		or
 			----post cases
 			(
 			pii_cube_services.preferred_channel = 'postal'
@@ -199,12 +201,12 @@ select
 	payer_name as client_name,
 	voucher_code as first_voucher_code,
 	null::int as patient_id,
-	0 as control_flag, 
-	1 as count_cases_patient, 
+	0 as control_flag,
+	1 as count_cases_patient,
 	null::numeric as reached_patient_flag,
-	null::date as reached_date, 
+	null::date as reached_date,
 	null::text as refusal_reason,
-	null::numeric as opt_out, 
+	null::numeric as opt_out,
 	null::text as new_case_id,
 	null::text as app_state,
 	null::text as korb,
