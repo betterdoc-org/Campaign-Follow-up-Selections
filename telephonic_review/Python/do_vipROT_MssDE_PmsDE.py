@@ -198,7 +198,7 @@ all_cases = pd.read_sql(
         									from "communication-cs-surveys".survey_links
         			 						left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id								
         									where surveys.title like '%PROM%')
-        		and services.case_id not in (select case_id from staging.stg_communication_cs_conversations__conversations where product like 'PMS%' and topics = '["feedback_follow_up"]' and case_id is not null)
+        		and services.case_id not in (select case_id from pii_analytics.pii_fct_parc_conversations where product like 'PMS%' and topics @> ARRAY['feedback_follow_up'] and case_id is not null)
         		and services.case_id not in (select case_id
         									from md_campaigns.cam_select cs
         										left join md_campaigns.cam_batch cb on cs.batch_id = cb.batch_id
