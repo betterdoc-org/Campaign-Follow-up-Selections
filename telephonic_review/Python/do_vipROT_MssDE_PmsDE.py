@@ -8,9 +8,11 @@ Created on Mon Apr  8 10:16:57 2024
 
 ## IMPORT PACKAGES
 import requests
+from requests.adapters import HTTPAdapter
 import os  # create folder for person
 import psycopg2  # connection to dataocean package
 import pandas as pd  # dataframe package
+from urllib3.util.retry import Retry
 
 
 # ==========================================================================================
@@ -236,40 +238,98 @@ all_cases = pd.read_sql(
 # ==========================================================================================
 
 
+# Robust session setup for transient Trello/API transport errors.
+trello_session = requests.Session()
+trello_retry = Retry(
+	total=5,
+	connect=5,
+	read=5,
+	backoff_factor=1,
+	status_forcelist=[429, 500, 502, 503, 504],
+	allowed_methods=frozenset(["GET", "POST"]),
+	raise_on_status=False,
+)
+trello_adapter = HTTPAdapter(max_retries=trello_retry)
+trello_session.mount("https://", trello_adapter)
+trello_session.mount("http://", trello_adapter)
+
+
 # nur wenn all_cases Ergebnisse enthält, dann sollen Trello-Karten erstellt werden
 if not all_cases.empty:
-    # Erstellt für jede case_id eine neue Karte im Board 'Telefonische Nachbefragung'
-    for case_id, payer_name, korb in zip(
-        all_cases["case_id"], all_cases["client_name"], all_cases["korb"]
-    ):
-        if korb == "waiting_q3":
-            label_id = [
-                "625e9b8626925b41dc0dd419",
-                "647d8e9c690a56479841600a",
-            ]  # id für Label 'tel. Nachbefragung', 'Q3 Fragebogen'
-        else:
-            label_id = [
-                "625e9b8626925b41dc0dd419",
-                "655ef650cbc61e435027751f",
-            ]  # id für Label 'tel. Nachbefragung', 'PMS'
+	cards_created = 0
+	card_failures = []
 
-        card_data = {
-            "key": api_key,
-            "token": token,
-            "idList": "6593bf668ced54ba6a049346",  # Trello-Liste 'VIP Rot'
-            "idBoard": "625825d7e1c26e06248efc0b",  # Trello-Board 'Telefonische Nachbefragung'
-            "name": case_id,
-            "idLabels": label_id,
-            "desc": payer_name,
-        }
-        # Erstelle eine neue Karte auf dem Trello-Board
-        response = requests.post(f"https://api.trello.com/1/cards", params=card_data)
+	# Erstellt für jede case_id eine neue Karte im Board 'Telefonische Nachbefragung'
+	for case_id, payer_name, korb in zip(
+		all_cases["case_id"], all_cases["client_name"], all_cases["korb"]
+	):
+		if korb == "waiting_q3":
+			label_id = [
+				"625e9b8626925b41dc0dd419",
+				"647d8e9c690a56479841600a",
+			]  # id für Label 'tel. Nachbefragung', 'Q3 Fragebogen'
+		else:
+			label_id = [
+				"625e9b8626925b41dc0dd419",
+				"655ef650cbc61e435027751f",
+			]  # id für Label 'tel. Nachbefragung', 'PMS'
 
-    # Überprüfe den Status der Anfrage
-    if response.status_code == 200:
-        print("Telefonie Board: Neue Karten erfolgreich erstellt!")
-    else:
-        print("Telefonie Board: Fehler beim Erstellen der Karten:", response.text)
+		card_data = {
+			"key": api_key,
+			"token": token,
+			"idList": "6593bf668ced54ba6a049346",  # Trello-Liste 'VIP Rot'
+			"idBoard": "625825d7e1c26e06248efc0b",  # Trello-Board 'Telefonische Nachbefragung'
+			"name": case_id,
+			"idLabels": ",".join(label_id),
+			"desc": payer_name,
+		}
+
+		# Erstelle eine neue Karte auf dem Trello-Board
+		try:
+			response = trello_session.post(
+				"https://api.trello.com/1/cards", params=card_data, timeout=(10, 30)
+			)
+			if response.status_code == 200:
+				cards_created += 1
+			else:
+				card_failures.append(
+					{
+						"case_id": case_id,
+						"status_code": response.status_code,
+						"error": response.text,
+					}
+				)
+		except requests.exceptions.RequestException as exc:
+			card_failures.append(
+				{
+					"case_id": case_id,
+					"status_code": None,
+					"error": str(exc),
+				}
+			)
+
+	trello_session.close()
+
+	# Überprüfe den Status der Anfrage
+	if cards_created > 0:
+		print(f"Telefonie Board: {cards_created} Karten erfolgreich erstellt.")
+	else:
+		print("Telefonie Board: Keine Karten erfolgreich erstellt.")
+
+	if card_failures:
+		print(
+			f"Telefonie Board: {len(card_failures)} Karten konnten nicht erstellt werden."
+		)
+		for failure in card_failures[:5]:
+			print(
+				"- case_id={case_id} status={status} error={error}".format(
+					case_id=failure["case_id"],
+					status=failure["status_code"],
+					error=failure["error"],
+				)
+			)
+		if len(card_failures) > 5:
+			print("- ... weitere Fehler wurden ausgelassen.")
 else:
     print("all_cases ist leer. Es werden keine Trello-Karten erstellt.")
 
