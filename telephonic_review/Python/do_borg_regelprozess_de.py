@@ -14,9 +14,11 @@ Achtung!!!!!:
 
 ## IMPORT PACKAGES
 import requests
+from requests.adapters import HTTPAdapter
 import os  # create folder for person
 import psycopg2  # connection to dataocean package
 import pandas as pd  # dataframe package
+from urllib3.util.retry import Retry
 
 
 # ==========================================================================================
@@ -72,127 +74,127 @@ dataocean_cursor = dataocean_connection.cursor()
 all_cases = pd.read_sql(
     """
   with borg_data as (
-	SELECT
-		distinct on (stg_borg__inquiries.case_id) stg_borg__inquiries.case_id,
-		row_number () over (partition by stg_borg__inquiries.case_id order by stg_borg__inquiries.voucher_ids[0]::int) as rn,
-		stg_borg__vouchers.client_name as voucher_client_name,
-		stg_borg__vouchers.value as first_voucher_code,
-		stg_borg__inquiry_appointments.state as app_state,
-		case when stg_borg__inquiry_appointments.state like 'call_patient' then dim_clean_borg_results.least_result_date
-			when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date else results_sent_at end as app_date,
-		stg_borg__inquiries.state as korb,
-		date_part('week', current_date) as current_week,
-		date_part('week', case when stg_borg__inquiry_appointments.state like 'call_patient' then dim_clean_borg_results.least_result_date
-							when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date 
-							else results_sent_at end) as week_appdate
-	FROM 
-		staging.stg_borg__inquiries
-    	left join analytics.dim_clean_borg_results on stg_borg__inquiries.service_id_key_systems = dim_clean_borg_results.service_id_key_systems
-		LEFT JOIN staging.stg_borg__inquiry_appointments on stg_borg__inquiries.id = stg_borg__inquiry_appointments.inquiry_id
-		left join (select inquiry_id, q3_result from staging.stg_borg__inquiry_physician_contact_entries where q3_result is not null) as stg_borg__inquiry_physician_contact_entries
-			on stg_borg__inquiry_physician_contact_entries.inquiry_id = stg_borg__inquiries.id
-		left join staging.stg_borg__vouchers on stg_borg__vouchers.id = stg_borg__inquiries.voucher_ids[0]::int
-	WHERE
-		stg_borg__inquiries.state like 'waiting_q3'
-		/*
-		!!! New decision to include 'surgery' in the selection of 'Regelprozess'
-		!!! 02.02.2026: Jira DA-3454
-		*/
-		and stg_borg__inquiries.treatment_type in ('second_opinion_before_surgery', 'surgery')
-		and stg_borg__inquiry_physician_contact_entries.q3_result is null
-		and stg_borg__inquiry_appointments.appointment_type = '3'
-		and stg_borg__inquiry_appointments.state in('sent', 'call_patient')
-		/*and stg_borg__inquiry_appointments.inquiry_id not in (select inquiry_id 
-																from staging.stg_borg__inquiry_appointments
-																where (appointment_type = '3' 
-																		and state like 'completed'))*/ --Muss ausgeschlossen werden, damit erreichte Fälle der Nachbetreuung nachtelefoniert werden
-		and stg_borg__vouchers.client_name not in ('VIP GELB', 'VIP ROT', 'BetterDoc Staff')
-		and (stg_borg__vouchers.value not like '%-MSSNACHRSO' 
-			and stg_borg__vouchers.value not like '%-BDTC' 
-			and stg_borg__vouchers.value not like 'NUBU-7777' 
-			and stg_borg__vouchers.value not like '%AXAP-%' 
-			and stg_borg__vouchers.value not like 'ARAG-CM22')
-	ORDER BY
-		stg_borg__inquiries.case_id, app_state, voucher_client_name
-		),
-	final_regelprozess as (
-	select
-		case_id,
-		voucher_client_name as client_name,
-		first_voucher_code,
-		null::int as patient_id,
-		0 as control_flag, 
-		1 as count_cases_patient, 
-		null::numeric as reached_patient_flag,
-		null::date as reached_date, 
-		null::text as refusal_reason,
-		null::numeric as opt_out, 
-		null::text as new_case_id,
-		app_state,
-		korb,
-		'de' as preferred_language,
-		null as post
-	from 
-		borg_data
-	where rn = '1'
-		and ((app_state like 'sent'
-			and date_part('week', current_date) = date_part('week', (app_date + interval '5 weeks'))
-			and date_part('year', (app_date + interval '5 weeks')) = date_part('year', current_date))
-		or (app_state like 'call_patient'
-			and date_part('week', current_date) = date_part('week', (app_date + interval '6 weeks'))
-			and date_part('year', (app_date + interval '6 weeks')) = date_part('year', current_date)))
-	order by app_state, voucher_client_name
+    SELECT
+        distinct on (stg_borg__inquiries.case_id) stg_borg__inquiries.case_id,
+        row_number () over (partition by stg_borg__inquiries.case_id order by stg_borg__inquiries.voucher_ids[0]::int) as rn,
+        stg_borg__vouchers.client_name as voucher_client_name,
+        stg_borg__vouchers.value as first_voucher_code,
+        stg_borg__inquiry_appointments.state as app_state,
+        case when stg_borg__inquiry_appointments.state like 'call_patient' then dim_clean_borg_results.least_result_date
+            when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date else results_sent_at end as app_date,
+        stg_borg__inquiries.state as korb,
+        date_part('week', current_date) as current_week,
+        date_part('week', case when stg_borg__inquiry_appointments.state like 'call_patient' then dim_clean_borg_results.least_result_date
+                            when stg_borg__inquiry_appointments.state like 'sent' then stg_borg__inquiry_appointments.scheduled_date 
+                            else results_sent_at end) as week_appdate
+    FROM 
+        staging.stg_borg__inquiries
+        left join analytics.dim_clean_borg_results on stg_borg__inquiries.service_id_key_systems = dim_clean_borg_results.service_id_key_systems
+        LEFT JOIN staging.stg_borg__inquiry_appointments on stg_borg__inquiries.id = stg_borg__inquiry_appointments.inquiry_id
+        left join (select inquiry_id, q3_result from staging.stg_borg__inquiry_physician_contact_entries where q3_result is not null) as stg_borg__inquiry_physician_contact_entries
+            on stg_borg__inquiry_physician_contact_entries.inquiry_id = stg_borg__inquiries.id
+        left join staging.stg_borg__vouchers on stg_borg__vouchers.id = stg_borg__inquiries.voucher_ids[0]::int
+    WHERE
+        stg_borg__inquiries.state like 'waiting_q3'
+        /*
+        !!! New decision to include 'surgery' in the selection of 'Regelprozess'
+        !!! 02.02.2026: Jira DA-3454
+        */
+        and stg_borg__inquiries.treatment_type in ('second_opinion_before_surgery', 'surgery')
+        and stg_borg__inquiry_physician_contact_entries.q3_result is null
+        and stg_borg__inquiry_appointments.appointment_type = '3'
+        and stg_borg__inquiry_appointments.state in('sent', 'call_patient')
+        /*and stg_borg__inquiry_appointments.inquiry_id not in (select inquiry_id 
+                                                                from staging.stg_borg__inquiry_appointments
+                                                                where (appointment_type = '3' 
+                                                                        and state like 'completed'))*/ --Muss ausgeschlossen werden, damit erreichte Fälle der Nachbetreuung nachtelefoniert werden
+        and stg_borg__vouchers.client_name not in ('VIP GELB', 'VIP ROT', 'BetterDoc Staff')
+        and (stg_borg__vouchers.value not like '%-MSSNACHRSO' 
+            and stg_borg__vouchers.value not like '%-BDTC' 
+            and stg_borg__vouchers.value not like 'NUBU-7777' 
+            and stg_borg__vouchers.value not like '%AXAP-%' 
+            and stg_borg__vouchers.value not like 'ARAG-CM22')
+    ORDER BY
+        stg_borg__inquiries.case_id, app_state, voucher_client_name
+        ),
+    final_regelprozess as (
+    select
+        case_id,
+        voucher_client_name as client_name,
+        first_voucher_code,
+        null::int as patient_id,
+        0 as control_flag, 
+        1 as count_cases_patient, 
+        null::numeric as reached_patient_flag,
+        null::date as reached_date, 
+        null::text as refusal_reason,
+        null::numeric as opt_out, 
+        null::text as new_case_id,
+        app_state,
+        korb,
+        'de' as preferred_language,
+        null as post
+    from 
+        borg_data
+    where rn = '1'
+        and ((app_state like 'sent'
+            and date_part('week', current_date) = date_part('week', (app_date + interval '5 weeks'))
+            and date_part('year', (app_date + interval '5 weeks')) = date_part('year', current_date))
+        or (app_state like 'call_patient'
+            and date_part('week', current_date) = date_part('week', (app_date + interval '6 weeks'))
+            and date_part('year', (app_date + interval '6 weeks')) = date_part('year', current_date)))
+    order by app_state, voucher_client_name
 ),
    post as (
-	select
-		distinct on (i.case_id) i.case_id,
-		ia.scheduled_date,
-		i.voucher_ids[0]::int as voucher_id,
-		i.treatment_type,
-		i.state as korb,
-		ia.appointment_type, 
-		ia.state as app_state,
-		v.client_name,
-		v.value
-	from
-		staging.stg_borg__inquiries i
-	    	left join staging.stg_borg__inquiry_patient_data ipd on ipd.inquiry_id = i.id
-	    	left join staging.stg_borg__inquiry_appointments ia on ipd.inquiry_id = ia.inquiry_id
-	    	left join staging.stg_borg__inquiry_insurance_data iid on ipd.inquiry_id = iid.inquiry_id
-	    	left join staging.stg_borg__vouchers v on v.id = i.voucher_ids[0]::int
-	where
-		ipd.preferred_communication_channel like 'post'
-		and i.state in ('waiting_q3', 'waiting_q4', 'waiting_q5', 'waiting_q6' )
-		and ia.appointment_type not in ('1', '2')
-		and ia.state like 'ready_to_send_pdf'
-		and iid.options::text = '[]'
-		and date_part('week', ia.scheduled_date) = date_part('week', (current_date - interval '1 week')) -----letzte Woche
-		and date_part('year', ia.scheduled_date) = date_part('year', (current_date - interval '1 week'))
-		and v.value is not null
-		and (v.client_name like 'DAK' or treatment_type in ('second_opinion_before_surgery', 'surgery'))
-		and v.client_name not like 'AXA Haftpflichtversicherung'
-	order by
-		i.case_id,
-		scheduled_date ASC
-	),
+    select
+        distinct on (i.case_id) i.case_id,
+        ia.scheduled_date,
+        i.voucher_ids[0]::int as voucher_id,
+        i.treatment_type,
+        i.state as korb,
+        ia.appointment_type, 
+        ia.state as app_state,
+        v.client_name,
+        v.value
+    from
+        staging.stg_borg__inquiries i
+            left join staging.stg_borg__inquiry_patient_data ipd on ipd.inquiry_id = i.id
+            left join staging.stg_borg__inquiry_appointments ia on ipd.inquiry_id = ia.inquiry_id
+            left join staging.stg_borg__inquiry_insurance_data iid on ipd.inquiry_id = iid.inquiry_id
+            left join staging.stg_borg__vouchers v on v.id = i.voucher_ids[0]::int
+    where
+        ipd.preferred_communication_channel like 'post'
+        and i.state in ('waiting_q3', 'waiting_q4', 'waiting_q5', 'waiting_q6' )
+        and ia.appointment_type not in ('1', '2')
+        and ia.state like 'ready_to_send_pdf'
+        and iid.options::text = '[]'
+        and date_part('week', ia.scheduled_date) = date_part('week', (current_date - interval '1 week')) -----letzte Woche
+        and date_part('year', ia.scheduled_date) = date_part('year', (current_date - interval '1 week'))
+        and v.value is not null
+        and (v.client_name like 'DAK' or treatment_type in ('second_opinion_before_surgery', 'surgery'))
+        and v.client_name not like 'AXA Haftpflichtversicherung'
+    order by
+        i.case_id,
+        scheduled_date ASC
+    ),
 final_post as (
-	select 
-		case_id,
-		client_name as client_name,
-		value as first_voucher_code,
-		null::int as patient_id,
-		0 as control_flag, 
-		1 as count_cases_patient, 
-		null::numeric as reached_patient_flag,
-		null::date as reached_date, 
-		null::text as refusal_reason,
-		null::numeric as opt_out, 
-		null::text as new_case_id,
-		app_state,
-		korb,
-		'de' as preferred_language,
-		'post' as post
-	from post
+    select 
+        case_id,
+        client_name as client_name,
+        value as first_voucher_code,
+        null::int as patient_id,
+        0 as control_flag, 
+        1 as count_cases_patient, 
+        null::numeric as reached_patient_flag,
+        null::date as reached_date, 
+        null::text as refusal_reason,
+        null::numeric as opt_out, 
+        null::text as new_case_id,
+        app_state,
+        korb,
+        'de' as preferred_language,
+        'post' as post
+    from post
 ),
 union_regelprozess_post as (
 select * from final_regelprozess
@@ -207,23 +209,23 @@ select * from final_post
        union_regelprozess_post.case_id,
        client_name,
        first_voucher_code,
-		patient_id,
-		control_flag, 
-		count_cases_patient, 
-		reached_patient_flag,
-		reached_date, 
-		refusal_reason,
-		opt_out, 
-		new_case_id,
-		app_state,
-		korb,
-		union_regelprozess_post.preferred_language,
-		post,
-		CASE WHEN cs.admission_channel IN ('online_marketing', 'partner_funnel') THEN 1 ELSE 0 END AS om_flag,
-		cs.inquiry_type
+        patient_id,
+        control_flag, 
+        count_cases_patient, 
+        reached_patient_flag,
+        reached_date, 
+        refusal_reason,
+        opt_out, 
+        new_case_id,
+        app_state,
+        korb,
+        union_regelprozess_post.preferred_language,
+        post,
+        CASE WHEN cs.admission_channel IN ('online_marketing', 'partner_funnel') THEN 1 ELSE 0 END AS om_flag,
+        cs.inquiry_type
    from 
-   	union_regelprozess_post
-   	left join (select distinct on (case_id) * from analytics.cube_services where product = 'MSS') as cs on union_regelprozess_post.case_id = cs.case_id
+       union_regelprozess_post
+       left join (select distinct on (case_id) * from analytics.cube_services where product = 'MSS') as cs on union_regelprozess_post.case_id = cs.case_id
    )
 select * from final
 """,
@@ -234,6 +236,24 @@ select * from final
 # ==========================================================================================
 # ==========================================================================================
 
+
+# Robust session setup for transient Trello/API transport errors.
+trello_session = requests.Session()
+trello_retry = Retry(
+    total=5,
+    connect=5,
+    read=5,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=frozenset(["GET", "POST"]),
+    raise_on_status=False,
+)
+trello_adapter = HTTPAdapter(max_retries=trello_retry)
+trello_session.mount("https://", trello_adapter)
+trello_session.mount("http://", trello_adapter)
+
+cards_created = 0
+card_failures = []
 
 # Erstellt für jede case_id eine neue Karte im Board 'Telefonische Nachbefragung'
 for case_id, payer_name, korb, om_flag, post, inquiry_type in zip(
@@ -277,17 +297,53 @@ for case_id, payer_name, korb, om_flag, post, inquiry_type in zip(
         "idList": "67236695bd1cf349e55eb5d6",  # Trello-Liste 'Pipeline Regelprozess'
         "idBoard": "625825d7e1c26e06248efc0b",  # Trello-Board 'Telefonische Nachbefragung'
         "name": case_id,
-        "idLabels": label_id,
+        "idLabels": label_id_str,
         "desc": payer_name,
     }
-    # Erstelle eine neue Karte auf dem Trello-Board
-    response = requests.post(f"https://api.trello.com/1/cards", params=card_data)
 
-# Überprüfe den Status der Anfrage
-if response.status_code == 200:
-    print("Telefonie Board: Neue Karten erfolgreich erstellt!")
+    # Erstelle eine neue Karte auf dem Trello-Board
+    try:
+        response = trello_session.post(
+            "https://api.trello.com/1/cards", params=card_data, timeout=(10, 30)
+        )
+        if response.status_code == 200:
+            cards_created += 1
+        else:
+            card_failures.append(
+                {
+                    "case_id": case_id,
+                    "status_code": response.status_code,
+                    "error": response.text,
+                }
+            )
+    except requests.exceptions.RequestException as exc:
+        card_failures.append(
+            {
+                "case_id": case_id,
+                "status_code": None,
+                "error": str(exc),
+            }
+        )
+
+trello_session.close()
+
+if cards_created > 0:
+    print(f"Telefonie Board: {cards_created} Karten erfolgreich erstellt.")
 else:
-    print("Telefonie Board: Fehler beim Erstellen der Karten:", response.text)
+    print("Telefonie Board: Keine Karten erfolgreich erstellt.")
+
+if card_failures:
+    print(f"Telefonie Board: {len(card_failures)} Karten konnten nicht erstellt werden.")
+    for failure in card_failures[:5]:
+        print(
+            "- case_id={case_id} status={status} error={error}".format(
+                case_id=failure["case_id"],
+                status=failure["status_code"],
+                error=failure["error"],
+            )
+        )
+    if len(card_failures) > 5:
+        print("- ... weitere Fehler wurden ausgelassen.")
 
 
 # ==========================================================================================
@@ -327,13 +383,13 @@ if not all_cases.empty:
     cam_batch = pd.read_sql(
         """
         select
-        	4 as cam_id,-------Regelprozess Deutschland
-        	(select max(batch_id) from md_campaigns.cam_select) as batch_id,
-        	'bd_nachtelefonie' as batch_acceptor,
-        	current_date as batch_selection_date,
-        	current_date as batch_transfer_date,
-        	current_date as batch_start,
-        	current_date + 30 as batch_stop
+            4 as cam_id,-------Regelprozess Deutschland
+            (select max(batch_id) from md_campaigns.cam_select) as batch_id,
+            'bd_nachtelefonie' as batch_acceptor,
+            current_date as batch_selection_date,
+            current_date as batch_transfer_date,
+            current_date as batch_start,
+            current_date + 30 as batch_stop
     """,
         dataocean_connection,
     )
@@ -361,47 +417,47 @@ post_cases = pd.read_sql(
     """
  with foo as (
     select
-    	distinct on (i.case_id) i.case_id,
-    	ia.scheduled_date,
-    	i.treatment_type,
-    	i.state as korb,
-    	ia.appointment_type, 
-    	ia.state as app_state,
-    	v.client_name
+        distinct on (i.case_id) i.case_id,
+        ia.scheduled_date,
+        i.treatment_type,
+        i.state as korb,
+        ia.appointment_type, 
+        ia.state as app_state,
+        v.client_name
     from
-    	staging.stg_borg__inquiries i
-    	left join staging.stg_borg__inquiry_patient_data ipd on ipd.inquiry_id = i.id
-    	left join staging.stg_borg__inquiry_appointments ia on ipd.inquiry_id = ia.inquiry_id
-    	left join staging.stg_borg__inquiry_insurance_data iid on ipd.inquiry_id = iid.inquiry_id
-    	left join staging.stg_borg__vouchers v on v.id = i.voucher_ids[0]::int
+        staging.stg_borg__inquiries i
+        left join staging.stg_borg__inquiry_patient_data ipd on ipd.inquiry_id = i.id
+        left join staging.stg_borg__inquiry_appointments ia on ipd.inquiry_id = ia.inquiry_id
+        left join staging.stg_borg__inquiry_insurance_data iid on ipd.inquiry_id = iid.inquiry_id
+        left join staging.stg_borg__vouchers v on v.id = i.voucher_ids[0]::int
     where
-    	preferred_communication_channel like 'post'
-    	and i.state in ('waiting_q3', 'waiting_q4', 'waiting_q5', 'waiting_q6' )
-    	and ia.appointment_type not in ('1', '2')
-    	and ia.state like 'ready_to_send_pdf'
-    	and options::text = '[]'
-    	--and ia.scheduled_date between (current_date - 7) and (current_date - 1)-----------------Datum anpassen
-    	and date_part('week', ia.scheduled_date) = date_part('week', (current_date - interval '1 week')) -----letzte Woche
-    	and date_part('year', ia.scheduled_date) = date_part('year', (current_date - interval '1 week'))
-    	and v.client_name is not null
-		/*
-		!!! New decision to include 'surgery' in the selection of 'Regelprozess'
-		!!! 02.02.2026: Jira DA-3454
-		*/
-    	and (v.client_name not like '%DAK%' 
-    		and treatment_type not in ('second_opinion_before_surgery', 'surgery'))
-    	and v.client_name not like 'AXA Haftpflichtversicherung'
+        preferred_communication_channel like 'post'
+        and i.state in ('waiting_q3', 'waiting_q4', 'waiting_q5', 'waiting_q6' )
+        and ia.appointment_type not in ('1', '2')
+        and ia.state like 'ready_to_send_pdf'
+        and options::text = '[]'
+        --and ia.scheduled_date between (current_date - 7) and (current_date - 1)-----------------Datum anpassen
+        and date_part('week', ia.scheduled_date) = date_part('week', (current_date - interval '1 week')) -----letzte Woche
+        and date_part('year', ia.scheduled_date) = date_part('year', (current_date - interval '1 week'))
+        and v.client_name is not null
+        /*
+        !!! New decision to include 'surgery' in the selection of 'Regelprozess'
+        !!! 02.02.2026: Jira DA-3454
+        */
+        and (v.client_name not like '%DAK%' 
+            and treatment_type not in ('second_opinion_before_surgery', 'surgery'))
+        and v.client_name not like 'AXA Haftpflichtversicherung'
     order by 
-    	i.case_id,
-    	i.state ASC
+        i.case_id,
+        i.state ASC
     )
     select 
-    	case_id,
-    	client_name,
-    	app_state,
-    	treatment_type
+        case_id,
+        client_name,
+        app_state,
+        treatment_type
     from 
-    	foo
+        foo
 """,
     dataocean_connection,
 )
