@@ -3,7 +3,7 @@ with case_cube as (
 	select * from analytics.cube_services
 	where 
 		case_id is not null
-		--and result_date between '2025-09-01' and '2025-11-30'
+		--and result_date between '2026-03-10' and '2026-07-23'
 		and result_date >= current_date - interval '6 month'
 		and payer_group in ('gkv', 'pkv')
 		AND product = 'MSS'
@@ -123,7 +123,7 @@ select
 	null::text app_state
 from distinct_patients
 )
-select * from cam_select
+select * from distinct_patients
 
 
 
