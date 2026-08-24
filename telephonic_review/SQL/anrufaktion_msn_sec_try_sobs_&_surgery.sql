@@ -55,15 +55,8 @@ where
 	and (status_survey_latest_planned_at is null or status_survey_latest_planned_at < (current_date - interval '1 weeks'))
 	and (prem_latest_planned_at is null or prem_latest_planned_at < (current_date - interval '2 weeks'))
 	and (prem_latest_sent_at is null or prem_latest_sent_at < (current_date - interval '2 weeks'))
-	AND (
-			(inquiry_type = 'surgery'
-			--case_id was not already selected for a telephonic review (meaning 'Anrtufaktion' or 'Regelprozess')
-			and case_id not in (select case_id from md_campaigns)
-			--patient_id was not already selected for a telephonic review a month ago (meaning 'Anrtufaktion' or 'Regelprozess')
-			and (dna_patient_id is null or dna_patient_id not in (select dna_patient_id from md_campaigns where dna_patient_id is not null and batch_selection_date >= current_date - interval '1 month'))
-			)
-			OR
-			(inquiry_type = 'second_opinion_before_surgery'
+	AND
+			(inquiry_type in ('second_opinion_before_surgery', 'surgery')
 			--case_id was not already selected for a telephonic review (meaning 'Anrtufaktion' or 'Regelprozess')
 			and case_id not in (select case_id from md_campaigns where batch_selection_date >= current_date - interval '1 month')
 			--patient_id was not already selected for a telephonic review a month ago (meaning 'Anrtufaktion' or 'Regelprozess')
@@ -71,12 +64,11 @@ where
 			--SOBS cases not already selected more then 1 time for telephonic review
 			and case_id not in (select case_id from md_campaigns_with_multiple_selections)
 			)
-		)
 	---------------------------------
 	--variable filters
 	---------------------------------
 	and inquiry_type in ('second_opinion_before_surgery', 'surgery')
-	and payer_name ilike '%Linde%'
+	and payer_name ilike '%Atupri%'
 ),
 final_dialer as ( 
 select
