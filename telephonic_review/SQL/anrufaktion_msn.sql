@@ -51,8 +51,8 @@ where
 	---------------------------------
 	--variable filters
 	---------------------------------
-	and inquiry_type != 'second_opinion_before_surgery'
-	and payer_name ilike '%Barmenia%'
+	and inquiry_type not in ('second_opinion_before_surgery', 'surgery')
+	and payer_name ilike '%HEK%'
 ),
 final_dialer as ( 
 select
