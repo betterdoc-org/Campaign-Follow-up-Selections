@@ -68,7 +68,7 @@ where
 	--variable filters
 	---------------------------------
 	and inquiry_type in ('second_opinion_before_surgery', 'surgery')
-	and payer_name ilike '%Atupri%'
+	and payer_name ilike '%SECURVITA BKK%'
 ),
 final_dialer as ( 
 select
@@ -112,7 +112,7 @@ select * from final;
 
 --insert into md_campaigns.cam_batch
 select
-	/*nachfolgend Zahl einfügen und später wieder löschen */ as cam_id, -------------Anrufaktion: Dialer
+	/*nachfolgend Zahl einfügen und später wieder löschen */56 as cam_id, -------------Second try: reg. follow up interview
 	(select max(batch_id) from md_campaigns.cam_select) as batch_id,
 	'bd_nachtelefonie' as batch_acceptor,
 	current_date as batch_selection_date,
