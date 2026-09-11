@@ -33,13 +33,9 @@ if filter_user == "david.wetzels":
     filter_user_credentials = (
         "/Users/david.wetzels/Documents/Credentials/trello_credentials.txt"
     )
-elif filter_user == "oumaima.el-bellam":
+elif filter_user == "lea.suessmilch":
     filter_user_credentials = (
-        "/Users/oumaima.el-bellam/Documents/Credentials/trello_credentials.txt"
-    )
-elif filter_user == 'alexander.maletz':
-    filter_user_credentials = (
-        "/Users/alexander.maletz/Documents/Credentials/trello.txt"
+        "/Users/lea.suessmilch/Documents/Credentials/trello_credentials.txt"
     )
 
 # Datei trello_credentials einlesen
@@ -52,13 +48,9 @@ with open(filter_user_credentials, "r") as file:
 # dataocean_credentials
 if filter_user == "david.wetzels":
     dataocean_credentials = "/Users/david.wetzels/Documents/Credentials/dataozean.txt"
-elif filter_user == "oumaima.el-bellam":
+elif filter_user == "lea.suessmilch":
     dataocean_credentials = (
-        "/Users/oumaima.el-bellam/Documents/Credentials/dataocean.txt"
-    )
-elif filter_user == 'alexander.maletz':
-    dataocean_credentials = (
-        "/Users/alexander.maletz/Documents/Credentials/dataocean.txt"
+        "/Users/lea.suessmilch/Documents/Credentials/dataozean.txt"
     )
 
 # connection to dataocean
