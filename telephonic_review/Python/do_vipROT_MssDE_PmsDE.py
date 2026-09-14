@@ -58,7 +58,7 @@ dataocean_cursor = dataocean_connection.cursor()
 # dataocean cases
 all_cases = pd.read_sql(
     """
-                 select *
+    select *
         from 
         (
         with borg_data as (
@@ -144,12 +144,12 @@ all_cases = pd.read_sql(
         				else null
         				end as title,
         		case when services.case_id in (select survey_links.case_id 
-        										from "communication-cs-surveys".survey_links 
-        										left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id
+        										from staging.stg_communication_cs_surveys__survey_links
+        										left join staging.stg_communication_cs_surveys__surveys ON surveys.id = survey_links.survey_id
         										where surveys.title like '%Allrounder%') then 'Allrounder' --Patient hat Status Survey inklusive PREM Link bekommen (Termin unbekannt)
         			 when services.case_id in (select survey_links.case_id 
-        			 								from "communication-cs-surveys".survey_links
-        			 								left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id
+        			 								from staging.stg_communication_cs_surveys__survey_links
+        			 								left join staging.stg_communication_cs_surveys__surveys ON surveys.id = survey_links.survey_id
         			 								where surveys.title like '%Reha%') then 'Reha' --Patient hat direkt PREM bekommen (Termin war bekannt)
         			 else null
         			 end as case_fb,
@@ -161,17 +161,17 @@ all_cases = pd.read_sql(
         		events.event_body -> 'properties' ->> 'reason' as grund,
         		channel_recommendation
         	FROM
-        		"service-cs-selection".services
-        		LEFT JOIN "service-cs-selection".contracts ON services.contract_id = contracts.id
-        		LEFT JOIN "service-cs-selection".payers ON contracts.payer_id = payers.id
-        		LEFT JOIN "service-cs-selection".vouchers ON services.voucher_id = vouchers.id
-        		left join "case-cs-workflow-events".events ON services.case_id = events.case_id
-        		LEFT JOIN "communication-cs-surveys".survey_links ON survey_links.case_id = services.case_id
-        		LEFT JOIN "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id	
-        		LEFT JOIN "patient-cs-communication-facts".communication_facts ON services.case_id = communication_facts.case_id
+        		staging.stg_service_cs_selection__services services
+        		LEFT JOIN staging.stg_service_cs_selection__contracts contracts ON services.contract_id = contracts.id
+        		LEFT JOIN staging.stg_service_cs_selection__payers payers ON contracts.payer_id = payers.id
+        		LEFT JOIN staging.stg_service_cs_selection__vouchers vouchers ON services.voucher_id = vouchers.id
+        		left join staging.stg_case_cs_workflow_events__events events ON services.case_id = events.case_id
+        		LEFT JOIN staging.stg_communication_cs_surveys__survey_links survey_links ON survey_links.case_id = services.case_id
+        		LEFT JOIN staging.stg_communication_cs_surveys__surveys surveys ON surveys.id = survey_links.survey_id	
+        		LEFT JOIN staging.stg_patient_cs_communication_facts__communication_facts communication_facts ON services.case_id = communication_facts.case_id
         		LEFT JOIN (select case_id, fazit
         					from (select case_id, event_time as fazit, row_number() over (partition by case_id order by event_time desc) as rn
-        							from "case-cs-workflow-events".events 
+        							from staging.stg_case_cs_workflow_events__events 
         							where event_type like 'DID_SEND_FINAL%') no_dublicates
         					where rn = 1
         							) fazit ON services.case_id = fazit.case_id
@@ -182,21 +182,24 @@ all_cases = pd.read_sql(
         		and services.service_id like '%:PMS%'
         		and (surveys.title like '%Nachbefragung%' or channel_recommendation not like 'email')
         		and services.case_id not in (select survey_links.case_id 
-        								from "communication-cs-surveys".survey_links
-        			 					left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id					
+        								from staging.stg_communication_cs_surveys__survey_links
+        			 					left join staging.stg_communication_cs_surveys__surveys ON surveys.id = survey_links.survey_id					
         								where surveys.title like '%Nachbefragung%' and response_status is not null) --SS/PREM noch nicht beantwortet
-        		and services.case_id not in (select case_id from "case-cs-workflow-events".events where event_type like '%DID_RECEIVE%') --betrachtet alle completion reasons, auch mehrfach nicht erreicht!! Ändern?
-        		and services.case_id not in (select events.case_id from "case-cs-workflow-events".events where event_type like '%DID_CLOSE%' and (event_body -> 'properties' ->> 'reason' like '%Keine weitere Befragung%' or event_body -> 'properties' ->> 'reason' like '%Befragung unangebracht%' or event_body -> 'properties' ->> 'reason' like '%Kontaktadresse%'))
+        		and services.case_id not in (select case_id from staging.stg_case_cs_workflow_events__events where event_type like '%DID_RECEIVE%') --betrachtet alle completion reasons, auch mehrfach nicht erreicht!! Ändern?
+        		and services.case_id not in (select events.case_id from staging.stg_case_cs_workflow_events__events where event_type like '%DID_CLOSE%' and (event_body -> 'properties' ->> 'reason' like '%Keine weitere Befragung%' or event_body -> 'properties' ->> 'reason' like '%Befragung unangebracht%' or event_body -> 'properties' ->> 'reason' like '%Kontaktadresse%'))
         		--im folgenden: keine Fälle in Anrufaktion, bei denen schon PROM rausgegangen ist
         		and services.case_id not in (select survey_links.case_id 
-        									from "communication-cs-surveys".survey_links
-        			 						left join "communication-cs-surveys".surveys ON surveys.id = survey_links.survey_id								
+        									from staging.stg_communication_cs_surveys__survey_links
+        			 						left join staging.stg_communication_cs_surveys__surveys ON surveys.id = survey_links.survey_id								
         									where surveys.title like '%PROM%')
         		and services.case_id not in (select case_id from pii_analytics.pii_fct_parc_conversations where product like 'PMS%' and topics @> ARRAY['feedback_follow_up'] and case_id is not null)
-        		and services.case_id not in (select case_id
+        		and services.case_id not in (select cs.case_id
         									from md_campaigns.cam_select cs
         										left join md_campaigns.cam_batch cb on cs.batch_id = cb.batch_id
-        									where cam_id not in (1, 2, 3, 8, -1))
+        										left join md_campaigns.cam_cam cc on cb.cam_id = cc.cam_id
+        									where cc.cam_category in ('Regelprozess', 
+        																'Anrufaktion')
+        									)
         	)
         	select
         		(select max(select_id) from md_campaigns.cam_select) + row_number() over() as select_id,
